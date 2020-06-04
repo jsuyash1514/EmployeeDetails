@@ -16,6 +16,7 @@ public class ServerVerticle extends AbstractVerticle {
     HttpServer server = vertx.createHttpServer();
     Router router = Router.router(vertx);
     router.get("/form").handler(this::formRenderer); // Handles the getRequest on URL/form (Here URL: localhost:8080)
+    router.get("/database").handler(this::databaseHandler);
     router.post().handler(BodyHandler.create());
     router.post("/register").handler(this::registerHandler); // Handle the post request on URL/register
     templateEngine = FreeMarkerTemplateEngine.create(vertx);
@@ -87,5 +88,19 @@ public class ServerVerticle extends AbstractVerticle {
      * context.response().putHeader("Location", "/form");
      * context.response().end();
      */
+  }
+  
+  private void databaseHandler(RoutingContext context) {
+    vertx.eventBus().request("DATABASE", new JsonObject(), messageAsyncResult -> {
+      JsonObject reply = (JsonObject)messageAsyncResult.result().body();
+      System.out.println(reply.toString());
+      if(messageAsyncResult.succeeded()) {
+        context.response().putHeader("Content-Type", "application/json");
+        context.response().end(reply.toString());
+      }
+      else {
+        context.fail(messageAsyncResult.cause());
+      }
+    });
   }
 }
