@@ -1,2 +1,4 @@
 Main.class
+DatabaseVerticle.class
 ServerVerticle.class
+Employee.class

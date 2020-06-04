@@ -1,6 +1,8 @@
+import com.google.gson.Gson;
 import io.vertx.core.AbstractVerticle;
 import io.vertx.core.Future;
 import io.vertx.core.http.HttpServer;
+import io.vertx.core.json.JsonObject;
 import io.vertx.ext.web.Router;
 import io.vertx.ext.web.RoutingContext;
 import io.vertx.ext.web.handler.BodyHandler;
@@ -43,26 +45,38 @@ public class ServerVerticle extends AbstractVerticle {
   }
   
   private void registerHandler(RoutingContext context) {
-    String employeeID = context.request().getParam("employeeid");
-    String name = context.request().getParam("name");
-    String age = context.request().getParam("age");
-    String salary = context.request().getParam("salary");
-    String address = context.request().getParam("address");
-    System.out.println("Details received: " + employeeID + "\t" + name + "\t" + age + "\t" + salary + "\t" + address);
+    Employee employee = new Employee(
+        context.request().getParam("employeeid"),
+        context.request().getParam("name"),
+        context.request().getParam("age"),
+        context.request().getParam("salary"),
+        context.request().getParam("address"));
+    JsonObject object = new JsonObject(new Gson().toJson(employee));
     
-    context.put("title", "Thanks for submitting");
-    context.put("employeeid", employeeID);
-    context.put("name", name);
-    context.put("age", age);
-    context.put("salary", salary);
-    context.put("address", address);
-    
-    templateEngine.render(context.data(), "templates/post_register.ftl", bufferAsyncResult -> {
-      if (bufferAsyncResult.succeeded()) {
-        context.response().putHeader("Content-Type", "text/html");
-        context.response().end(bufferAsyncResult.result()); //Parameter in end method is the response of the request. It can be a string, object, asyncResult.
-      } else {
-        context.fail(bufferAsyncResult.cause());
+    System.out.println("Details received: " + object.toString());
+    vertx.eventBus().request("PUSH", object, messageAsyncResult -> {
+      JsonObject reply = (JsonObject)messageAsyncResult.result().body();
+      if(messageAsyncResult.succeeded()){
+        System.out.println("Push to db: " + reply.toString());
+        context.put("title", "Thanks for submitting");
+        context.put("employeeid", employee.employeeID);
+        context.put("name", employee.name);
+        context.put("age", employee.age);
+        context.put("salary", employee.salary);
+        context.put("address", employee.address);
+  
+        templateEngine.render(context.data(), "templates/post_register.ftl", bufferAsyncResult -> {
+          if (bufferAsyncResult.succeeded()) {
+            context.response().putHeader("Content-Type", "text/html");
+            context.response().end(bufferAsyncResult.result()); //Parameter in end method is the response of the request. It can be a string, object, asyncResult.
+          } else {
+            context.fail(bufferAsyncResult.cause());
+          }
+        });
+      }
+      else {
+        System.out.println("Publish event failed");
+        context.fail(messageAsyncResult.cause());
       }
     });
     
